@@ -90,6 +90,6 @@ Provisionar via Helm charts **adicionados ao repositório GitOps** (não kubectl
 
 ## Estado herdado da Fase 03
 
-- Cluster EKS `togglemaster` **não está ativo no momento** (`aws eks list-clusters` retornou vazio em 2026-11-14) — infraestrutura foi destruída desde a última sessão. Precisa reaplicar o Terraform da Fase 03 antes de começar a empilhar a stack de observabilidade.
+- Cluster EKS `togglemaster` **não está ativo no momento** (`aws eks list-clusters` retornou vazio em 2026-11-14) — infraestrutura foi destruída desde a última sessão. Precisa reaplicar o Terraform antes de empilhar a stack de observabilidade.
 - Repo Fase 03: `github.com/pedrohenriqueortizcosta-blip/togglemaster-fase03`.
-- Ainda não existe repositório `togglemaster-fase04` no GitHub do usuário.
+- Repo Fase 04: `github.com/pedrohenriqueortizcosta-blip/togglemaster-fase04` — criado em 2026-11-14, seedado a partir do HEAD commitado da Fase 03 (histórico de git novo). **Criado como privado** (restrição da sessão contra criar superfícies públicas automaticamente) — lembrar de torná-lo público (ou adicionar os avaliadores como colaboradores) antes da entrega final, já que o link do repositório vai no relatório.
