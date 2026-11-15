@@ -124,3 +124,11 @@ Stack de observabilidade instalada via 2 Applications do ArgoCD (`kube-prometheu
 6. **Controller do próprio ArgoCD com estado interno travado** — mesmo com tudo corrigido, o controller ficava reemitindo o mesmo erro de etcd indefinidamente, descolado do campo `.operation` (já limpo). **Corrigido**: reiniciar o pod `argocd-application-controller-0` para forçar recarregar o estado persistido (pequeno, ~22KB) em vez de continuar com o estado em memória corrompido/inflado.
 
 Acesso ao Grafana: `kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80`, usuário `admin`, senha em `kubectl get secret kube-prometheus-stack-grafana -n monitoring -o jsonpath='{.data.admin-password}' | base64 -d`.
+
+**Dashboard customizado criado** (`gitops/monitoring/dashboards/togglemaster-overview-configmap.yaml`, uid `togglemaster-overview`, título "ToggleMaster — Ecosystem Health"), via uma 3ª Application do ArgoCD (`grafana-dashboards`, path simples em git, sem Helm) que aplica um ConfigMap com a label `grafana_dashboard: "1"` — descoberto automaticamente pelo sidecar do Grafana, sem precisar de restart. 4 painéis:
+1. Uso de CPU por nó (%) — `node_cpu_seconds_total`.
+2. Uso de memória por nó (%) — `node_memory_MemAvailable_bytes`/`MemTotal_bytes`.
+3. **Taxa de tráfego por microsserviço** (bytes/s de rede, via `container_network_{receive,transmit}_bytes_total` do kubelet/cAdvisor) — usado como *proxy* de "taxa de requisições" enquanto os serviços não expõem métricas HTTP próprias. **Nota para o relatório/vídeo**: isto será substituído por uma taxa de requisições HTTP real assim que a Fase 2/3 (OTel Collector + instrumentação) estiver pronta — mesmo dashboard, painel atualizado.
+4. Logs em tempo real (Loki) de todos os 5 namespaces de microsserviço.
+
+Todas as 3 queries foram validadas com dados reais via a API do Prometheus antes de serem commitadas.
