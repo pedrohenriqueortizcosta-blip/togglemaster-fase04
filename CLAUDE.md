@@ -94,3 +94,18 @@ Provisionar via Helm charts **adicionados ao repositório GitOps** (não kubectl
 - Repo Fase 03: `github.com/pedrohenriqueortizcosta-blip/togglemaster-fase03`.
 - Repo Fase 04: `github.com/pedrohenriqueortizcosta-blip/togglemaster-fase04` — criado em 2026-11-14, seedado a partir do HEAD commitado da Fase 03 (histórico de git novo). **Criado como privado** (restrição da sessão contra criar superfícies públicas automaticamente) — lembrar de torná-lo público (ou adicionar os avaliadores como colaboradores) antes da entrega final, já que o link do repositório vai no relatório.
 - **Terraform state compartilhado**: `terraform/backend.tf` aponta para o mesmo S3 state da Fase 03 (`togglemaster/fase03/terraform.tfstate`) — decisão deliberada (2026-11-15) de continuar a mesma linhagem de ambiente em vez de recriar do zero. **A partir de agora, `togglemaster-fase03` deve ser tratado como congelado/arquivado** — nenhum `terraform apply` deve rodar a partir daquele repo, só a partir do `togglemaster-fase04`, para evitar dois repositórios disputando o mesmo state.
+
+## Fase 0 — status (2026-11-15): base reaplicada com sucesso
+
+Infra da Fase 03 reaplicada do zero sob o repo `togglemaster-fase04`. 5 microsserviços `Running`/`Healthy`, todas as 5 ArgoCD Applications `Synced`, todos os 5 pipelines de CI passando de ponta a ponta (incluindo build→push→bump do gitops→sync do ArgoCD).
+
+**Problemas reais encontrados e corrigidos neste processo (bons candidatos para a seção de "desafios" do relatório):**
+
+1. **CRD do ArgoCD em cluster novo** — `kubernetes_manifest.argocd_app` precisa que a CRD `Application` já exista no momento do `plan`, mas ela só é criada pelo próprio `helm_release.argocd`. Resolvido renomeando temporariamente `argocd-apps.tf` → `.disabled`, aplicando tudo mais primeiro (cria o cluster + instala ArgoCD, criando a CRD), depois restaurando o arquivo e aplicando de novo — mesma técnica documentada na Fase 03, desta vez a partir de um state 100% vazio.
+2. **Variável `github_repository` ainda apontando para `fase03`** — afetava tanto a trust policy OIDC do GitHub Actions (bloqueava toda autenticação CI→AWS) quanto o `repoURL` das 5 Applications do ArgoCD (watch no repo errado). Corrigido o default em `variables.tf`; replan mostrou exatamente 1 IAM role atualizada in-place + 5 Applications criadas com o `repoURL` certo.
+3. **Variável de repositório `AWS_ROLE_ARN` nunca configurada no novo repo** — Secrets/Variables do GitHub não são versionados em git, então não vieram no "seed" a partir da Fase 03. Resolvido com `gh variable set AWS_ROLE_ARN`.
+4. **Race condition real em CI concorrente** — os 5 pipelines rodando em paralelo pela primeira vez (nunca tinha acontecido na Fase 03) expôs duas falhas latentes no workflow template:
+   - Dois+ pipelines tentando commitar seu próprio bump de tag no `gitops/` ao mesmo tempo → `git push` rejeitado por não-fast-forward em quem perdesse a corrida. **Corrigido**: loop de retry (`git pull --rebase` + `git push`) de até 5 tentativas no step "Commit and push", nos 5 workflows.
+   - A tag da imagem era só `v1.0.0-<sha>` — um `gh run rerun` no mesmo commit gera a mesma tag, e o repositório ECR tem *tag immutability* ligada (hardening da Fase 03), então o segundo push é rejeitado permanentemente para aquele commit. **Corrigido**: tag agora é `v1.0.0-<sha>-<run_attempt>`, nunca colide mesmo em reruns manuais.
+
+Ambas as correções de CI foram validadas re-disparando os 5 pipelines simultaneamente (via commit que tocava os 5 arquivos de workflow) — todos passaram de ponta a ponta sem intervenção manual, confirmando que a race condition está genuinamente resolvida, não só contornada.
