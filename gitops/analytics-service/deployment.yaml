@@ -18,7 +18,7 @@ spec:
       serviceAccountName: analytics-service
       containers:
         - name: analytics-service
-          image: 108101918154.dkr.ecr.us-east-1.amazonaws.com/analytics-service:v1.0.0-bea2d2a
+          image: 108101918154.dkr.ecr.us-east-1.amazonaws.com/analytics-service:v1.0.0-ac91e3a
           ports:
             - containerPort: 8005
           env:
