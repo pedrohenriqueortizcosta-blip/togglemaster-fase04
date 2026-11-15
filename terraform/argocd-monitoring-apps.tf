@@ -55,7 +55,13 @@ resource "kubernetes_manifest" "argocd_app_kube_prometheus_stack" {
           prune    = true
           selfHeal = true
         }
-        syncOptions = ["CreateNamespace=false"]
+        # ServerSideApply: this chart's CRDs (Prometheus, Alertmanager,
+        # AlertmanagerConfig) are each ~1MB — client-side apply embeds the
+        # whole object a SECOND time as a "last-applied-configuration"
+        # annotation, which blows past Kubernetes' hard 256KB-per-annotation
+        # limit ("metadata.annotations: Too long"). Server-side apply skips
+        # that duplication entirely.
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
       }
     }
   }
@@ -104,7 +110,10 @@ resource "kubernetes_manifest" "argocd_app_loki_stack" {
           prune    = true
           selfHeal = true
         }
-        syncOptions = ["CreateNamespace=false"]
+        # ServerSideApply for consistency with kube-prometheus-stack — this
+        # chart's own CRDs are small, but no reason to risk the same
+        # annotation-size failure if that ever changes.
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
       }
     }
   }
