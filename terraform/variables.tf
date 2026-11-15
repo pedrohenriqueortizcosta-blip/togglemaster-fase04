@@ -122,5 +122,5 @@ variable "sqs_queue_name" {
 variable "github_repository" {
   description = "GitHub 'org/repo' allowed to assume the CI OIDC role for ECR push."
   type        = string
-  default     = "pedrohenriqueortizcosta-blip/togglemaster-fase03"
+  default     = "pedrohenriqueortizcosta-blip/togglemaster-fase04"
 }

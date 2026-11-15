@@ -1,5 +1,5 @@
 variable "github_repository" {
-  description = "GitHub 'org/repo' allowed to assume this role, e.g. pedrohenriqueortizcosta-blip/togglemaster-fase03."
+  description = "GitHub 'org/repo' allowed to assume this role, e.g. pedrohenriqueortizcosta-blip/togglemaster-fase04."
   type        = string
 }
 
