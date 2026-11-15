@@ -37,7 +37,11 @@ variable "kubernetes_version" {
 variable "node_instance_types" {
   description = "EC2 instance types for the EKS managed node group."
   type        = list(string)
-  default     = ["t3.small"]
+  # t3.medium (was t3.small) from Fase04 onward: the observability stack
+  # (Prometheus/Grafana/Loki/Promtail, then the OTel Collector + Datadog
+  # agent in later phases) is memory-hungry and pod-count-hungry — t3.small's
+  # ~1.47GB allocatable memory and 11-pod ENI cap left almost no room.
+  default = ["t3.medium"]
 }
 
 variable "node_group_min_size" {
@@ -52,7 +56,7 @@ variable "node_group_max_size" {
 
 variable "node_group_desired_size" {
   type    = number
-  default = 2
+  default = 3
 }
 
 variable "microservices" {

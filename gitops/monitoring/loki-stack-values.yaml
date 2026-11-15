@@ -1,0 +1,27 @@
+# Values for grafana/loki-stack (chart 2.10.3), applied via the "loki"
+# ArgoCD Application (terraform/argocd-monitoring-apps.tf). This is the
+# simpler, filesystem-backed "quick-start" Loki bundle — appropriate for a
+# single small coursework cluster (no S3/GCS object storage to set up,
+# unlike the production-grade distributed "loki" chart).
+#
+# grafana.enabled stays false here (chart default) — we already have one
+# Grafana from kube-prometheus-stack, wired to this Loki as a datasource
+# via its own values file.
+
+loki:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+promtail:
+  # Runs as a DaemonSet — one pod per node (3 total right now), tailing
+  # every container's logs on that node and shipping them to Loki.
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      memory: 128Mi

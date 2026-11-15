@@ -90,10 +90,13 @@ resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOn
 # Managed Node Group (private subnets)
 # ---------------------------------------------------------------------------
 resource "aws_eks_node_group" "general" {
-  cluster_name    = aws_eks_cluster.this.name
-  node_group_name = "general"
-  node_role_arn   = aws_iam_role.node_group.arn
-  subnet_ids      = var.private_subnet_ids
+  cluster_name = aws_eks_cluster.this.name
+  # name_prefix (not a fixed name) + create_before_destroy below: this lets a
+  # replacement node group (e.g. a future instance-type change) join the
+  # cluster BEFORE the old one is destroyed, instead of a brief full outage.
+  node_group_name_prefix = "general-"
+  node_role_arn          = aws_iam_role.node_group.arn
+  subnet_ids             = var.private_subnet_ids
 
   ami_type       = "AL2023_x86_64_STANDARD"
   instance_types = var.node_instance_types
@@ -107,6 +110,10 @@ resource "aws_eks_node_group" "general" {
 
   update_config {
     max_unavailable = 1
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 
   depends_on = [
