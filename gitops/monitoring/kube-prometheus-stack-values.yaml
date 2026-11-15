@@ -3,9 +3,38 @@
 # (terraform/argocd-monitoring-apps.tf). Sized for a small 3x t3.medium
 # coursework cluster — no persistent volumes, modest retention, resource
 # requests kept deliberately small everywhere.
+#
+# EKS-specific tuning below (defaultRules/dashboards/kubeApiServer etc.):
+# the chart's defaults assume a self-managed (kubeadm) cluster where you can
+# scrape the control plane directly. On EKS, AWS runs the control plane and
+# never exposes etcd/apiserver/controller-manager/scheduler to us — leaving
+# those enabled just creates ~130 resources (mostly PrometheusRule objects
+# for components we can't see, plus generic dashboard ConfigMaps), which
+# actually broke ArgoCD's sync entirely: the Application's status object
+# (listing every synced resource) exceeded etcd's ~1.5MB per-object limit
+# ("etcdserver: request is too large"), so the sync could never even record
+# as complete. Trimming to only what EKS can actually provide fixes both
+# problems — it's the correct EKS configuration, not just a workaround.
+defaultRules:
+  # The generic upstream alert-rule library (35 PrometheusRule objects) —
+  # we're writing our own targeted alert for the auth-service 5xx-rate
+  # requirement later, so we don't need this whole bundled library.
+  create: false
+
+kubeApiServer:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
 
 grafana:
   enabled: true
+  # Bundled generic dashboards off — we're building our own custom
+  # dashboard for this project's requirement instead.
+  defaultDashboardsEnabled: false
   # No admin password set on purpose — the chart auto-generates one into a
   # Secret, same pattern already used for ArgoCD's own bootstrap admin
   # password. Retrieve it with:
