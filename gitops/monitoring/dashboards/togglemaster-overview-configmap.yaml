@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: togglemaster-overview-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  togglemaster-overview.json: |
+    {
+      "title": "ToggleMaster — Ecosystem Health",
+      "uid": "togglemaster-overview",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "tags": ["togglemaster", "fase04"],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Cluster CPU usage per node (%)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 },
+            "overrides": []
+          }
+        },
+        {
+          "id": 2,
+          "title": "Cluster memory usage per node (%)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100 },
+            "overrides": []
+          }
+        },
+        {
+          "id": 3,
+          "title": "Microservice traffic rate (network I/O, bytes/s) — proxy for request rate until Phase 2/3 app metrics (OTel) land",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "datasource": "Prometheus",
+          "targets": [
+            {
+              "datasource": "Prometheus",
+              "expr": "sum(rate(container_network_receive_bytes_total{namespace=~\"auth-service|flag-service|targeting-service|evaluation-service|analytics-service\"}[5m])) by (namespace)",
+              "legendFormat": "{{namespace}} (in)",
+              "refId": "A"
+            },
+            {
+              "datasource": "Prometheus",
+              "expr": "sum(rate(container_network_transmit_bytes_total{namespace=~\"auth-service|flag-service|targeting-service|evaluation-service|analytics-service\"}[5m])) by (namespace)",
+              "legendFormat": "{{namespace}} (out)",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "Bps" },
+            "overrides": []
+          }
+        },
+        {
+          "id": 4,
+          "title": "Live logs — all microservices",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 16 },
+          "datasource": "Loki",
+          "targets": [
+            {
+              "datasource": "Loki",
+              "expr": "{namespace=~\"auth-service|flag-service|targeting-service|evaluation-service|analytics-service\"}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": true,
+            "wrapLogMessage": true,
+            "sortOrder": "Descending"
+          }
+        }
+      ]
+    }

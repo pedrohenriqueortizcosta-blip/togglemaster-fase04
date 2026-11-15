@@ -69,6 +69,47 @@ resource "kubernetes_manifest" "argocd_app_kube_prometheus_stack" {
   depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
 }
 
+resource "kubernetes_manifest" "argocd_app_grafana_dashboards" {
+  # Plain git-path Application (no Helm chart involved) — same pattern as
+  # the 5 microservices' own Applications in argocd-apps.tf. Just applies
+  # whatever ConfigMaps live in gitops/monitoring/dashboards/; Grafana's
+  # own sidecar (enabled by default in kube-prometheus-stack) discovers any
+  # ConfigMap labeled "grafana_dashboard: 1" and loads it automatically —
+  # no restart needed when a dashboard is added or changed here.
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "grafana-dashboards"
+      namespace = kubernetes_namespace.argocd.metadata[0].name
+    }
+    spec = {
+      project = "default"
+
+      source = {
+        repoURL        = "https://github.com/${var.github_repository}.git"
+        targetRevision = "main"
+        path           = "gitops/monitoring/dashboards"
+      }
+
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = kubernetes_namespace.monitoring.metadata[0].name
+      }
+
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=false"]
+      }
+    }
+  }
+
+  depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
+}
+
 resource "kubernetes_manifest" "argocd_app_loki_stack" {
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
