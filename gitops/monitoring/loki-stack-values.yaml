@@ -5,10 +5,16 @@
 # unlike the production-grade distributed "loki" chart).
 #
 # grafana.enabled stays false here (chart default) — we already have one
-# Grafana from kube-prometheus-stack, wired to this Loki as a datasource
-# via its own values file.
-
+# Grafana from kube-prometheus-stack. This chart auto-registers Loki as a
+# datasource with ANY Grafana in the cluster via a ConfigMap labeled
+# "grafana_datasource: 1" (sidecar-discovered), regardless of grafana.enabled
+# — so no manual datasource entry is needed on the Grafana side.
+#
+# isDefault must be overridden to false: this chart's own default is true,
+# which collides with kube-prometheus-stack's own Prometheus datasource
+# (also isDefault: true) — Grafana refuses to start with two defaults.
 loki:
+  isDefault: false
   resources:
     requests:
       cpu: 50m
