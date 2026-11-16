@@ -61,3 +61,12 @@ test:
   enabled: false
 lokiCanary:
   enabled: false
+
+# Memcached-based caching (chunks + query results) — a production-scale
+# performance optimization. At our ingest volume it's pure overhead: one of
+# these StatefulSets couldn't even schedule ("Insufficient memory" on all 3
+# nodes) when first deployed.
+resultsCache:
+  enabled: false
+chunksCache:
+  enabled: false
