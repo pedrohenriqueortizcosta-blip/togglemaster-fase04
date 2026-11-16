@@ -37,10 +37,15 @@ singleBinary:
     limits:
       memory: 512Mi
   persistence:
-    size: 10Gi
-    # Cluster only has "gp2" as a StorageClass, not marked as the default —
-    # the PVC was stuck Pending ("no storage class is set") without this.
-    storageClass: gp2
+    # Disabled — this cluster has no EBS CSI driver installed (only EFS),
+    # and the "gp2" StorageClass's provisioner (kubernetes.io/aws-ebs, the
+    # old in-tree plugin) was fully REMOVED in Kubernetes 1.27+. The PVC
+    # sat Pending forever with no controller able to ever provision it —
+    # not a timing issue, a genuine missing dependency. Same call already
+    # made for Prometheus: ephemeral (pod-local) storage is an acceptable
+    # tradeoff at coursework scale — losing chunks on a pod restart is
+    # fine, and this avoids standing up a whole CSI driver just for this.
+    enabled: false
 
 # SimpleScalable-mode components — must be explicitly zeroed when using
 # SingleBinary, otherwise the chart refuses to render ("more than zero
