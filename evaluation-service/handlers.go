@@ -45,7 +45,10 @@ func (a *App) evaluationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Obter a decisão (lógica de cache/serviço está em evaluator.go)
-	result, err := a.getDecision(userID, flagName)
+	// r.Context() carrega o span criado pelo otelhttp.NewHandler (main.go)
+	// — repassar esse contexto é o que conecta as chamadas de saída ao
+	// mesmo trace da requisição recebida.
+	result, err := a.getDecision(r.Context(), userID, flagName)
 	if err != nil {
 		// Se o erro for "não encontrado", retornamos 'false' (comportamento seguro)
 		if _, ok := err.(*NotFoundError); ok {

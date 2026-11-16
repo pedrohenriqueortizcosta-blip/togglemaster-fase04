@@ -32,6 +32,12 @@ kubeconfig
 
 # Go
 **/vendor/
+# Compiled binaries named after their module (e.g. `go build ./...` run
+# from inside auth-service/ or evaluation-service/ produces a binary with
+# no extension matching the directory name) — never actually gitignored
+# before now, a real gap found while testing the Phase 3 instrumentation.
+/auth-service/auth-service
+/evaluation-service/evaluation-service
 
 # Python
 **/__pycache__/
