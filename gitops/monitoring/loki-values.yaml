@@ -46,6 +46,16 @@ singleBinary:
     # tradeoff at coursework scale — losing chunks on a pod restart is
     # fine, and this avoids standing up a whole CSI driver just for this.
     enabled: false
+  # Disabling persistence removes the /var/loki mount entirely (not
+  # "replace with emptyDir") — but our filesystem storage config still
+  # needs a writable directory there ("mkdir /var/loki: read-only file
+  # system" without this). Supplying our own emptyDir explicitly.
+  extraVolumes:
+    - name: loki-data
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: loki-data
+      mountPath: /var/loki
 
 # SimpleScalable-mode components — must be explicitly zeroed when using
 # SingleBinary, otherwise the chart refuses to render ("more than zero
