@@ -7,8 +7,12 @@
 #   metrics -> Prometheus (via the "prometheus" exporter, scraped below)
 #   logs    -> Loki        (via "otlphttp", straight to Loki's native OTLP
 #              ingestion endpoint)
-#   traces  -> debug only for now; Datadog exporter gets added in Phase 3
-#              once a real API key exists to configure it with.
+#   traces  -> Datadog (US1/datadoghq.com), via the "datadog" exporter. The
+#              API key is NEVER stored here — it's a Kubernetes Secret
+#              ("otel-collector-datadog", namespace monitoring, key
+#              "api-key") created directly in the cluster, injected as the
+#              DD_API_KEY env var below, and referenced in the exporter
+#              config via ${env:DD_API_KEY}.
 #
 # "contrib" image (not the default "core" one) — the dedicated "loki"
 # exporter we originally planned to use has actually been REMOVED from
@@ -52,6 +56,15 @@ serviceMonitor:
     - port: metrics
     - port: prometheus
 
+# Injects the Datadog API key from a Secret created directly in the
+# cluster (never committed) — see the comment above for its name/key.
+extraEnvs:
+  - name: DD_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: otel-collector-datadog
+        key: api-key
+
 config:
   exporters:
     # "normal" (the default) only logs summary counts ("spans: 4") — useful
@@ -67,6 +80,10 @@ config:
       # default "/v1/logs" suffix), so we use the signal-specific override
       # with the complete, exact path rather than relying on endpoint+suffix.
       logs_endpoint: "http://loki.monitoring.svc.cluster.local:3100/otlp/v1/logs"
+    datadog:
+      api:
+        key: ${env:DD_API_KEY}
+        site: datadoghq.com
   service:
     pipelines:
       metrics:
@@ -74,4 +91,4 @@ config:
       logs:
         exporters: [debug, otlphttp]
       traces:
-        exporters: [debug]
+        exporters: [debug, datadog]
