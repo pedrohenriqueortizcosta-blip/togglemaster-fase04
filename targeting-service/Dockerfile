@@ -25,4 +25,7 @@ EXPOSE 8003
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8003", "app:app"]
+# "opentelemetry-instrument" wraps the real command: it patches Flask and
+# requests in-process at startup (from the packages in requirements.txt),
+# with zero changes to app.py itself.
+CMD ["opentelemetry-instrument", "gunicorn", "--bind", "0.0.0.0:8003", "app:app"]

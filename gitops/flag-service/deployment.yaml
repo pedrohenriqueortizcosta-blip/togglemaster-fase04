@@ -23,6 +23,12 @@ spec:
           env:
             - name: AUTH_SERVICE_URL
               value: "http://auth-service.auth-service.svc.cluster.local:8001"
+            - name: OTEL_SERVICE_NAME
+              value: "flag-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
           envFrom:
             - secretRef:
                 name: flag-service-secret
