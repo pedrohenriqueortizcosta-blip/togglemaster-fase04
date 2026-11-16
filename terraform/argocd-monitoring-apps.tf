@@ -118,18 +118,19 @@ resource "kubernetes_manifest" "argocd_app_otel_collector" {
   depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
 }
 
-resource "kubernetes_manifest" "argocd_app_grafana_dashboards" {
+resource "kubernetes_manifest" "argocd_app_grafana_provisioning" {
   # Plain git-path Application (no Helm chart involved) — same pattern as
-  # the 5 microservices' own Applications in argocd-apps.tf. Just applies
-  # whatever ConfigMaps live in gitops/monitoring/dashboards/; Grafana's
-  # own sidecar (enabled by default in kube-prometheus-stack) discovers any
-  # ConfigMap labeled "grafana_dashboard: 1" and loads it automatically —
-  # no restart needed when a dashboard is added or changed here.
+  # the 5 microservices' own Applications in argocd-apps.tf. Applies
+  # whatever ConfigMaps live under gitops/monitoring/grafana-provisioning/
+  # (dashboards/ and datasources/ subfolders); Grafana's own sidecar
+  # (enabled by default in kube-prometheus-stack) discovers ConfigMaps
+  # labeled "grafana_dashboard: 1" or "grafana_datasource: 1" and loads
+  # them automatically — no restart needed when something's added here.
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
-      name      = "grafana-dashboards"
+      name      = "grafana-provisioning"
       namespace = kubernetes_namespace.argocd.metadata[0].name
     }
     spec = {
@@ -138,7 +139,13 @@ resource "kubernetes_manifest" "argocd_app_grafana_dashboards" {
       source = {
         repoURL        = "https://github.com/${var.github_repository}.git"
         targetRevision = "main"
-        path           = "gitops/monitoring/dashboards"
+        path           = "gitops/monitoring/grafana-provisioning"
+        directory = {
+          # ArgoCD's directory source only reads the top level by default —
+          # without this, the dashboards/ and datasources/ subfolders here
+          # would be silently ignored.
+          recurse = true
+        }
       }
 
       destination = {
@@ -159,15 +166,17 @@ resource "kubernetes_manifest" "argocd_app_grafana_dashboards" {
   depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
 }
 
-resource "kubernetes_manifest" "argocd_app_loki_stack" {
+resource "kubernetes_manifest" "argocd_app_loki" {
+  # Standalone grafana/loki chart — replaces the deprecated loki-stack
+  # bundle (see loki-values.yaml for why). Release/Application name "loki"
+  # is deliberately kept, so the Service still resolves as plain
+  # "loki.monitoring.svc.cluster.local" — nothing downstream (the Grafana
+  # datasource, Promtail's client, the OTel Collector's exporter) needed to
+  # change because of this migration, only loki-stack -> loki + promtail.
   manifest = {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
-      # Helm release name = "loki" (matches the Application name), which is
-      # what makes the Loki service resolve as plain "loki" in-cluster —
-      # the datasource URL in kube-prometheus-stack-values.yaml depends on
-      # this exact name.
       name      = "loki"
       namespace = kubernetes_namespace.argocd.metadata[0].name
     }
@@ -177,10 +186,10 @@ resource "kubernetes_manifest" "argocd_app_loki_stack" {
       sources = [
         {
           repoURL        = "https://grafana.github.io/helm-charts"
-          chart          = "loki-stack"
-          targetRevision = "2.10.3"
+          chart          = "loki"
+          targetRevision = "7.6.0"
           helm = {
-            valueFiles = ["$values/gitops/monitoring/loki-stack-values.yaml"]
+            valueFiles = ["$values/gitops/monitoring/loki-values.yaml"]
           }
         },
         {
@@ -200,9 +209,53 @@ resource "kubernetes_manifest" "argocd_app_loki_stack" {
           prune    = true
           selfHeal = true
         }
-        # ServerSideApply for consistency with kube-prometheus-stack — this
-        # chart's own CRDs are small, but no reason to risk the same
-        # annotation-size failure if that ever changes.
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+      }
+    }
+  }
+
+  depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
+}
+
+resource "kubernetes_manifest" "argocd_app_promtail" {
+  # Standalone grafana/promtail chart — the log-shipping half of what
+  # loki-stack used to bundle together with Loki itself.
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "promtail"
+      namespace = kubernetes_namespace.argocd.metadata[0].name
+    }
+    spec = {
+      project = "default"
+
+      sources = [
+        {
+          repoURL        = "https://grafana.github.io/helm-charts"
+          chart          = "promtail"
+          targetRevision = "6.17.1"
+          helm = {
+            valueFiles = ["$values/gitops/monitoring/promtail-values.yaml"]
+          }
+        },
+        {
+          repoURL        = "https://github.com/${var.github_repository}.git"
+          targetRevision = "main"
+          ref            = "values"
+        },
+      ]
+
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = kubernetes_namespace.monitoring.metadata[0].name
+      }
+
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
         syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
       }
     }

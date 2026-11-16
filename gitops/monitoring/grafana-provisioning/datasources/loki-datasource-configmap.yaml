@@ -1,0 +1,22 @@
+# Manually provisioned Grafana datasource for Loki — needed because, unlike
+# the old (now-retired) loki-stack chart, the standalone grafana/loki chart
+# doesn't auto-register itself with any cluster Grafana. Same sidecar
+# discovery mechanism as our dashboard ConfigMap: the
+# "grafana_datasource: 1" label gets picked up automatically, no restart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-datasource
+  namespace: monitoring
+  labels:
+    grafana_datasource: "1"
+data:
+  loki-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.monitoring.svc.cluster.local:3100
+        isDefault: false
+        version: 1

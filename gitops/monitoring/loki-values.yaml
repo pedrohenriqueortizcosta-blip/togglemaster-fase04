@@ -1,0 +1,63 @@
+# Values for grafana/loki (chart 7.6.0, app v3.6.18), applied via the "loki"
+# ArgoCD Application. Replaces the old loki-stack bundle (app v2.6.1,
+# deprecated upstream) — needed because loki-stack's Loki predates native
+# OTLP log ingestion, which the OTel Collector now requires (its dedicated
+# "loki" exporter was removed from current otelcol-contrib builds in favor
+# of just pushing OTLP directly to Loki's native /otlp/v1/logs endpoint).
+#
+# SingleBinary mode + filesystem storage: appropriate for our small
+# coursework cluster — no object storage (S3/GCS) to provision, no HA.
+# auth_enabled: false keeps this single-tenant, same simplicity as before
+# (the chart defaults to multi-tenant, which would require an
+# X-Scope-OrgID header on every request from Promtail/Grafana/the
+# Collector — unnecessary complexity at our scale).
+
+deploymentMode: SingleBinary
+
+loki:
+  auth_enabled: false
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+
+singleBinary:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  persistence:
+    size: 10Gi
+
+# SimpleScalable-mode components — must be explicitly zeroed when using
+# SingleBinary, otherwise the chart refuses to render ("more than zero
+# replicas configured for both the single binary and simple scalable
+# targets").
+write:
+  replicas: 0
+read:
+  replicas: 0
+backend:
+  replicas: 0
+
+# No nginx gateway, no bundled MinIO, no test/canary pods — direct access
+# to the singleBinary service (still named plain "loki", same as before)
+# keeps this as simple as the old setup.
+gateway:
+  enabled: false
+minio:
+  enabled: false
+test:
+  enabled: false
+lokiCanary:
+  enabled: false

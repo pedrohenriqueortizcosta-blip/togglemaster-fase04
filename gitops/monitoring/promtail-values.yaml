@@ -1,0 +1,17 @@
+# Values for grafana/promtail (chart 6.17.1), applied via the "promtail"
+# ArgoCD Application. Replaces loki-stack's bundled promtail — same
+# standalone-chart migration as loki-values.yaml, just the log-shipping
+# agent half. Runs as a DaemonSet (one pod per node) by default; tails
+# every container's logs and pushes them to our "loki" service directly
+# (bypassing the gateway we disabled in loki-values.yaml).
+
+config:
+  clients:
+    - url: http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 128Mi

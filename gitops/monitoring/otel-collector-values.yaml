@@ -5,14 +5,20 @@
 # send metrics/logs/traces here (via OTLP, once instrumented in Phase 3),
 # and this Collector routes each signal to the correct backend:
 #   metrics -> Prometheus (via the "prometheus" exporter, scraped below)
-#   logs    -> Loki        (via the "loki" exporter)
+#   logs    -> Loki        (via "otlphttp", straight to Loki's native OTLP
+#              ingestion endpoint)
 #   traces  -> debug only for now; Datadog exporter gets added in Phase 3
 #              once a real API key exists to configure it with.
 #
-# "contrib" image (not the default "core" one) because the "loki" exporter
-# isn't in core — confirmed our deployed Loki is v2.6.1, which predates
-# native OTLP log ingestion (that landed in Loki 3.0+), so we need this
-# traditional exporter pushing to Loki's older /loki/api/v1/push API.
+# "contrib" image (not the default "core" one) — the dedicated "loki"
+# exporter we originally planned to use has actually been REMOVED from
+# current otelcol-contrib builds (confirmed via the collector's own error:
+# "'exporters' unknown type: loki"). Grafana's own ecosystem has moved to
+# native OTLP ingestion instead, which is why we migrated Loki itself from
+# the old loki-stack bundle (v2.6.1) to the current standalone grafana/loki
+# chart (v3.6.18) — see loki-values.yaml. "contrib" is still the right
+# image choice regardless, since "core" lacks several other exporters we
+# may want later.
 
 mode: deployment
 
@@ -51,13 +57,16 @@ config:
     debug: {}
     prometheus:
       endpoint: "0.0.0.0:8889"
-    loki:
-      endpoint: "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+    otlphttp:
+      # Loki's OTLP logs path is "/otlp/v1/logs" (not the exporter's
+      # default "/v1/logs" suffix), so we use the signal-specific override
+      # with the complete, exact path rather than relying on endpoint+suffix.
+      logs_endpoint: "http://loki.monitoring.svc.cluster.local:3100/otlp/v1/logs"
   service:
     pipelines:
       metrics:
         exporters: [debug, prometheus]
       logs:
-        exporters: [debug, loki]
+        exporters: [debug, otlphttp]
       traces:
         exporters: [debug]
