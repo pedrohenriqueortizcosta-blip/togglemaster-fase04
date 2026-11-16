@@ -132,3 +132,19 @@ Acesso ao Grafana: `kubectl port-forward -n monitoring svc/kube-prometheus-stack
 4. Logs em tempo real (Loki) de todos os 5 namespaces de microsserviço.
 
 Todas as 3 queries foram validadas com dados reais via a API do Prometheus antes de serem commitadas.
+
+## Fase 2 — status (2026-11-16): OTel Collector no ar, Loki migrado para o chart atual
+
+OTel Collector instalado via `open-telemetry/opentelemetry-collector` (imagem `contrib`), `mode: deployment`, Application `otel-collector` no ArgoCD. Pipelines: métricas → exporter `prometheus` (porta 8889, scraped via ServiceMonitor) → nosso Prometheus; logs → exporter `otlphttp` → ingestão OTLP nativa do Loki; traces → `debug` por enquanto (exporter do Datadog entra na Fase 3, quando existir uma API key real para configurar).
+
+**Migração não-planejada, mas necessária: Loki `loki-stack` (2.6.1, deprecado) → `grafana/loki` standalone (7.6.0, app 3.6.11) + `grafana/promtail` (6.17.1) separado.** Causa raiz: o exporter dedicado `loki` foi **removido** das builds atuais do `otelcol-contrib` — o ecossistema Grafana migrou para ingestão OTLP nativa no Loki (só existe a partir da 3.0+), tornando aquele exporter obsoleto. Nosso Loki antigo (via loki-stack) estava preso na 2.6.1.
+
+**Cadeia de problemas reais enfrentados nessa migração:**
+1. **Colisão de nomes** entre o StatefulSet/Services antigos (loki-stack) e os novos (grafana/loki) — ambos usam o nome de release "loki". StatefulSets têm campos imutáveis (`volumeClaimTemplates`), então uma atualização in-place teria sido rejeitada. Resolvido apagando os recursos antigos antes de aplicar os novos.
+2. **Cache de render do ArgoCD repo-server ficou stale** — mesmo com a Application corretamente configurada para o chart novo, o StatefulSet aplicado continuava com labels do chart antigo (`chart: loki-2.16.0`). Resolvido reiniciando o pod `argocd-repo-server`.
+3. **PVC presa em `Pending`** — `storage class is set` ausente (sem StorageClass default no cluster) → corrigido especificando `gp2` explicitamente → só então descobrimos que **o cluster não tem o driver CSI do EBS instalado** (só tem EFS), e o provisionador antigo in-tree `kubernetes.io/aws-ebs` foi **removido do Kubernetes a partir da 1.27+** — não era questão de tempo, nenhum controlador no cluster conseguiria provisionar aquele volume. Resolvido desabilitando persistência (mesma escolha já feita para o Prometheus — armazenamento efêmero é aceitável nesta escala).
+4. **Desabilitar persistência removeu o mount de `/var/loki` inteiramente** (não virou `emptyDir` automaticamente) — Loki falhava com `mkdir /var/loki: read-only file system`. Corrigido adicionando um `emptyDir` manual via `extraVolumes`/`extraVolumeMounts`.
+5. **Memcached de cache (chunks/results)** do novo chart, habilitado por padrão, não conseguia ser agendado por falta de memória — desabilitado (`chunksCache.enabled: false`, `resultsCache.enabled: false`), overhead desnecessário no nosso volume de ingestão.
+6. **Promtail travado após o período de instabilidade do Loki** — probe de readiness **sem resposta** (timeout, não apenas erro), sugerindo o processo preso, não só aguardando o Loki voltar. Resolvido reiniciando os pods.
+
+Datasource do Loki no Grafana agora é provisionado manualmente (`gitops/monitoring/grafana-provisioning/datasources/loki-datasource-configmap.yaml`), já que o chart standalone não se auto-registra como o loki-stack fazia — mesmo mecanismo de sidecar discovery (`grafana_datasource: "1"`) usado para o dashboard customizado. A pasta foi reorganizada de `dashboards/` para `grafana-provisioning/{dashboards,datasources}/`, com a Application do ArgoCD usando `directory.recurse: true` para pegar as subpastas.
