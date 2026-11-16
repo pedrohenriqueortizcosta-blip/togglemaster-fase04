@@ -69,6 +69,55 @@ resource "kubernetes_manifest" "argocd_app_kube_prometheus_stack" {
   depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
 }
 
+resource "kubernetes_manifest" "argocd_app_otel_collector" {
+  # Mandatory central telemetry piece (requirement 2): receives OTLP
+  # metrics/logs/traces from the 5 microservices (once instrumented in
+  # Phase 3) and routes each to the right backend — see
+  # gitops/monitoring/otel-collector-values.yaml for the pipeline config.
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "otel-collector"
+      namespace = kubernetes_namespace.argocd.metadata[0].name
+    }
+    spec = {
+      project = "default"
+
+      sources = [
+        {
+          repoURL        = "https://open-telemetry.github.io/opentelemetry-helm-charts"
+          chart          = "opentelemetry-collector"
+          targetRevision = "0.178.3"
+          helm = {
+            valueFiles = ["$values/gitops/monitoring/otel-collector-values.yaml"]
+          }
+        },
+        {
+          repoURL        = "https://github.com/${var.github_repository}.git"
+          targetRevision = "main"
+          ref            = "values"
+        },
+      ]
+
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = kubernetes_namespace.monitoring.metadata[0].name
+      }
+
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=false", "ServerSideApply=true"]
+      }
+    }
+  }
+
+  depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
+}
+
 resource "kubernetes_manifest" "argocd_app_grafana_dashboards" {
   # Plain git-path Application (no Helm chart involved) — same pattern as
   # the 5 microservices' own Applications in argocd-apps.tf. Just applies
