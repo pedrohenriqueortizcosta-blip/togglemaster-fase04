@@ -38,6 +38,9 @@ singleBinary:
       memory: 512Mi
   persistence:
     size: 10Gi
+    # Cluster only has "gp2" as a StorageClass, not marked as the default —
+    # the PVC was stuck Pending ("no storage class is set") without this.
+    storageClass: gp2
 
 # SimpleScalable-mode components — must be explicitly zeroed when using
 # SingleBinary, otherwise the chart refuses to render ("more than zero
