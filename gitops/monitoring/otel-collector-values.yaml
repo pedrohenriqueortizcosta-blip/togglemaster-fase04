@@ -83,7 +83,14 @@ config:
     datadog:
       api:
         key: ${env:DD_API_KEY}
-        site: datadoghq.com
+        # Account's actual data region turned out to be AP2 (Asia Pacific),
+        # confirmed via the "ap2.datadoghq.com" URL Datadog's own UI
+        # redirected to — not US1/datadoghq.com as originally assumed.
+        # Sending to the wrong site is why traces weren't showing up even
+        # though the Collector reported "successfully sent": it got a
+        # response from US1's intake, just not the site this account's
+        # data actually lives in.
+        site: ap2.datadoghq.com
   service:
     pipelines:
       metrics:
