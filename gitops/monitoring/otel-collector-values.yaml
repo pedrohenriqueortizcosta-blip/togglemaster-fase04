@@ -54,7 +54,12 @@ serviceMonitor:
 
 config:
   exporters:
-    debug: {}
+    # "normal" (the default) only logs summary counts ("spans: 4") — useful
+    # to confirm data is flowing at all, but not to actually see service
+    # names or trace IDs. "detailed" prints the real span content, which is
+    # what we actually want while verifying instrumentation during Phase 3.
+    debug:
+      verbosity: detailed
     prometheus:
       endpoint: "0.0.0.0:8889"
     otlphttp:
