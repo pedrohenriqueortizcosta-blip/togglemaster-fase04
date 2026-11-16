@@ -28,6 +28,12 @@ spec:
               value: "https://sqs.us-east-1.amazonaws.com/108101918154/togglemaster-evaluation-service"
             - name: AWS_DYNAMODB_TABLE
               value: "ToggleMasterAnalytics"
+            - name: OTEL_SERVICE_NAME
+              value: "analytics-service"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector-opentelemetry-collector.monitoring.svc.cluster.local:4317"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
           resources:
             requests:
               cpu: 100m

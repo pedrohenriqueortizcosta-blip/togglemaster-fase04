@@ -25,4 +25,8 @@ EXPOSE 8005
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8005", "app:app"]
+# "opentelemetry-instrument" patches botocore/flask at the interpreter
+# level before app.py is even imported, so the SQS worker thread (started
+# at module import time) is instrumented too, not just the Flask /health
+# route — zero changes to app.py itself.
+CMD ["opentelemetry-instrument", "gunicorn", "--bind", "0.0.0.0:8005", "app:app"]

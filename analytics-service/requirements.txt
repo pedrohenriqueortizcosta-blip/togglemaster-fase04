@@ -2,3 +2,14 @@ Flask==3.0.3
 gunicorn==21.2.0
 python-dotenv==0.21.0
 boto3==1.35.0
+# OTel instrumentation — same "opentelemetry-instrument" auto-patch approach
+# as flag-service/targeting-service, zero app code changes. "botocore" (not
+# "boto3") is the instrumented package here — boto3 is a thin wrapper around
+# botocore's clients, which is where the actual SQS/DynamoDB API calls run.
+# This gives spans for the SQS receive/delete and DynamoDB put_item calls;
+# full trace-context propagation across the async SQS boundary (producer ->
+# queue -> this consumer) is out of scope — the original design has no
+# mechanism to carry trace context in SQS message attributes.
+opentelemetry-distro[otlp]==0.66b2
+opentelemetry-instrumentation-flask==0.66b2
+opentelemetry-instrumentation-botocore==0.66b2
