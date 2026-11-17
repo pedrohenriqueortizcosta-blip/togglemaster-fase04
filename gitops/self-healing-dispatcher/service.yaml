@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: self-healing-dispatcher
+  namespace: self-healing-dispatcher
+  labels:
+    app: self-healing-dispatcher
+spec:
+  type: ClusterIP
+  selector:
+    app: self-healing-dispatcher
+  ports:
+    - port: 8006
+      targetPort: 8006

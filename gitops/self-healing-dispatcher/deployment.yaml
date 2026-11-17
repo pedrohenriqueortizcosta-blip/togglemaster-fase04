@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healing-dispatcher
+  namespace: self-healing-dispatcher
+  labels:
+    app: self-healing-dispatcher
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: self-healing-dispatcher
+  template:
+    metadata:
+      labels:
+        app: self-healing-dispatcher
+    spec:
+      containers:
+        - name: self-healing-dispatcher
+          image: 108101918154.dkr.ecr.us-east-1.amazonaws.com/self-healing-dispatcher:v1.0.0-placeholder-1
+          ports:
+            - containerPort: 8006
+          env:
+            - name: GITHUB_REPO
+              value: "pedrohenriqueortizcosta-blip/togglemaster-fase04"
+          envFrom:
+            - secretRef:
+                name: self-healing-dispatcher-secret
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8006
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8006
+            initialDelaySeconds: 10
+            periodSeconds: 20

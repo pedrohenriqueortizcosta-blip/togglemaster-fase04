@@ -60,9 +60,9 @@ variable "node_group_desired_size" {
 }
 
 variable "microservices" {
-  description = "Canonical list of the 5 ToggleMaster microservices (used to fan out ECR repos, RDS instances where relevant, etc.)."
+  description = "Canonical list of the 5 ToggleMaster microservices, plus Requirement 4's self-healing-dispatcher (used to fan out ECR repos, namespaces, ArgoCD Applications, RDS instances where relevant, etc.)."
   type        = list(string)
-  default     = ["auth-service", "flag-service", "targeting-service", "evaluation-service", "analytics-service"]
+  default     = ["auth-service", "flag-service", "targeting-service", "evaluation-service", "analytics-service", "self-healing-dispatcher"]
 }
 
 variable "rds_databases" {
