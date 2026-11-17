@@ -39,6 +39,8 @@ Each has its own namespace, its own GitOps-managed Deployment, and its own OTel 
 - **Promtail** — DaemonSet shipping every container's stdout/stderr into Loki.
 - **Grafana** — single pane of glass. Custom dashboard "ToggleMaster — Ecosystem Health", 4 panels: cluster CPU%, cluster memory%, per-service network I/O (request-rate proxy), live Loki logs across all 5 service namespaces.
 
+> **Bug fixed 2026-11-17**: the logs panel was empty because Loki's internal ring never reached quorum — the `grafana/loki` chart defaults `commonConfig.replication_factor` to 3 regardless of `deploymentMode`, but we only run 1 `singleBinary` replica. This silently rejected both reads *and* Promtail's writes since the Phase 2 migration (`"at least 2 live replicas required, could only find 1"`). Fixed by setting `loki.commonConfig.replication_factor: 1` in `loki-values.yaml`. Verified end-to-end with a fresh test request, confirming a log line reached Loki within seconds of the fix.
+
 ## 5. OTel Collector — the central routing piece
 
 The mandatory piece tying the microservices to both the open-source stack and the commercial APM:
