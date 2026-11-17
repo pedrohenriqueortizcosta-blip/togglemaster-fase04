@@ -64,10 +64,45 @@ All 5 microservices send traces here over OTLP/gRPC — none talk to Datadog dir
 - Confirmed live in Datadog: all 5 services show up in Traces (700+ indexed spans), `evaluation-service`'s Dependencies page shows real arrows to `flag-service` and `targeting-service`, `analytics-service`'s Dependencies page shows its AWS-side calls (`sts`, the SQS queue) via the `botocore` instrumentor.
 - `analytics-service`'s DynamoDB `PutItem` write is confirmed at the application-log level (real, successful write), though catching that specific span in Datadog's UI is subject to trial-account trace sampling — a single one-off event has real odds of not being the one randomly retained, unlike the continuously-repeating `ReceiveMessage` calls.
 
-## 7. Requirement 4 (Alerts / Self-Healing) — not yet built
+## 7. Requirement 4 (Alerts / Self-Healing) — complete
 
-_Placeholder — to be filled in once this phase is done: smart alert (e.g. auth-service 5xx rate), PagerDuty incident, Slack ChatOps notification, and a self-healing GitHub Action (webhook-triggered `kubectl rollout restart`) via Fase03's existing OIDC role._
+```
+  Prometheus                 Alertmanager                 self-healing-dispatcher
+┌──────────────┐  alert    ┌──────────────┐   webhook    ┌──────────────────────┐
+│ auth-service  │ ───────▶ │  routes to:  │ ───────────▶ │ translates to a real  │
+│ 5xx rate > 5% │  fires   │ 3 receivers  │   (parallel) │ repository_dispatch   │
+└──────────────┘           │ in parallel: │              │ call via GitHub's API │
+                           └──────┬───────┘              └───────────┬──────────┘
+                     ┌────────────┼────────────┐                     │
+                     ▼            ▼            ▼                     ▼
+               ┌──────────┐ ┌──────────┐ ┌───────────┐     ┌────────────────────┐
+               │PagerDuty │ │  Slack   │ │(dispatcher│     │ GitHub Action       │
+               │ incident │ │ #alerts  │ │  webhook) │     │ "Self-Healing"      │
+               └──────────┘ └──────────┘ └───────────┘     │ (repository_dispatch│
+                                                            │  trigger)           │
+                                                            │                     │
+                                                            │ assumes existing    │
+                                                            │ OIDC role (same one │
+                                                            │ every CI pipeline   │
+                                                            │ uses) → now also    │
+                                                            │ granted:            │
+                                                            │ - eks:DescribeCluster│
+                                                            │   (IAM)             │
+                                                            │ - get/list/watch/   │
+                                                            │   patch Deployments │
+                                                            │   (K8s RBAC, scoped │
+                                                            │   to auth-service   │
+                                                            │   namespace only)   │
+                                                            │                     │
+                                                            │ runs:               │
+                                                            │ kubectl rollout     │
+                                                            │ restart deployment/ │
+                                                            │ auth-service        │
+                                                            └─────────────────────┘
+```
 
-## Diagram
+The alert rule's metric (`http_server_duration_milliseconds_count`) comes from `auth-service`'s own `otelhttp` instrumentation (same OTLP pipeline as Phase 3's traces), routed through the OTel Collector to Prometheus.
 
-_Placeholder — full end-to-end architecture diagram to be added once Requirement 4 is complete._
+**Real bug found while building this**: the OTel Collector's `ServiceMonitor` had been missing the `release: kube-prometheus-stack` label Prometheus's `serviceMonitorSelector` requires — meaning Prometheus had *never* actually scraped any app-level metric through the Collector, since Phase 2. This was silent (no errors anywhere) until this alert's query was tested against real data. Fixed via `serviceMonitor.extraLabels` in `otel-collector-values.yaml`. Full bug list (6 total, including an IAM permission gap and a Prometheus label-collision rename) is in `CLAUDE.md`'s "Requisito 4" section.
+
+**Verified end-to-end with a real, deliberately-induced failure**: `auth-service`'s dedicated RDS instance was stopped (each service has its own instance — confirmed via Terraform, so this had zero blast radius on `flag-service`/`targeting-service`), driving its 5xx rate to 48.6% against real test traffic. The alert fired, PagerDuty opened a real incident, Slack posted to `#alerts`, the dispatcher fired a real `repository_dispatch`, and the GitHub Action ran a genuine `kubectl rollout restart` — confirmed via `deployment.apps/auth-service restarted` in the Action's own logs, and the pod's restart count in `kubectl get pods`.
