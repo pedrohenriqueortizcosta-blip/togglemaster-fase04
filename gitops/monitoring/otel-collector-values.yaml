@@ -55,6 +55,16 @@ serviceMonitor:
   metricsEndpoints:
     - port: metrics
     - port: prometheus
+  # Real bug found 2026-11-17: this chart is a separate Helm release from
+  # kube-prometheus-stack, so its auto-generated ServiceMonitor never had
+  # the "release: kube-prometheus-stack" label that Prometheus's own
+  # serviceMonitorSelector (matchLabels: release=kube-prometheus-stack)
+  # requires -- meaning Prometheus had NEVER actually scraped this
+  # Collector at all, since Phase 2. Every metric query against app-level
+  # data (e.g. the Requirement 4 auth-service 5xx-rate alert) was silently
+  # evaluating against empty data the whole time, not failing loudly.
+  extraLabels:
+    release: kube-prometheus-stack
 
 # Injects the Datadog API key from a Secret created directly in the
 # cluster (never committed) — see the comment above for its name/key.
