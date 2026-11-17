@@ -166,6 +166,46 @@ resource "kubernetes_manifest" "argocd_app_grafana_provisioning" {
   depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
 }
 
+resource "kubernetes_manifest" "argocd_app_prometheus_rules" {
+  # Plain git-path Application, same pattern as grafana-provisioning above.
+  # Applies PrometheusRule CRDs living under gitops/monitoring/prometheus-rules/
+  # — the Requirement 4 alert rules. Each rule needs the "release:
+  # kube-prometheus-stack" label to be picked up by the Prometheus CR's
+  # ruleSelector (confirmed via `kubectl get prometheus -o jsonpath=...`).
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = "prometheus-rules"
+      namespace = kubernetes_namespace.argocd.metadata[0].name
+    }
+    spec = {
+      project = "default"
+
+      source = {
+        repoURL        = "https://github.com/${var.github_repository}.git"
+        targetRevision = "main"
+        path           = "gitops/monitoring/prometheus-rules"
+      }
+
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = kubernetes_namespace.monitoring.metadata[0].name
+      }
+
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = ["CreateNamespace=false"]
+      }
+    }
+  }
+
+  depends_on = [helm_release.argocd, kubernetes_namespace.monitoring]
+}
+
 resource "kubernetes_manifest" "argocd_app_loki" {
   # Standalone grafana/loki chart — replaces the deprecated loki-stack
   # bundle (see loki-values.yaml for why). Release/Application name "loki"
