@@ -76,6 +76,49 @@ alertmanager:
         memory: 64Mi
       limits:
         memory: 128Mi
+    # Mounts each Secret's keys as files under
+    # /etc/alertmanager/secrets/<secret-name>/<key> — lets the config
+    # below reference the PagerDuty integration key and Slack webhook URL
+    # via *_file fields instead of inlining the actual secret values here
+    # (this file is committed to git).
+    secrets:
+      - pagerduty-auth-service
+      - slack-webhook
+
+  # Requirement 4: routes the AuthServiceHighErrorRate alert (see
+  # gitops/monitoring/prometheus-rules/auth-service-5xx-rate.yaml) to
+  # PagerDuty (incident), Slack (ChatOps), and the self-healing-dispatcher
+  # service (translates this webhook into a GitHub repository_dispatch
+  # call, which the self-healing Action picks up) — all three in parallel,
+  # as receivers under the same route.
+  config:
+    route:
+      receiver: "null"
+      group_by: ["alertname"]
+      group_wait: 10s
+      group_interval: 10s
+      # Long on purpose for a demo: keeps PagerDuty/Slack from re-firing
+      # every few minutes while an alert stays active during testing.
+      repeat_interval: 1h
+      routes:
+        - receiver: "auth-service-critical"
+          matchers:
+            - severity = "critical"
+    receivers:
+      - name: "null"
+      - name: "auth-service-critical"
+        pagerduty_configs:
+          - routing_key_file: /etc/alertmanager/secrets/pagerduty-auth-service/integration-key
+            severity: critical
+        slack_configs:
+          - api_url_file: /etc/alertmanager/secrets/slack-webhook/webhook-url
+            channel: "#alerts"
+            send_resolved: true
+            title: "{{ .CommonAnnotations.summary }}"
+            text: "{{ .CommonAnnotations.description }}"
+        webhook_configs:
+          - url: "http://self-healing-dispatcher.self-healing-dispatcher.svc.cluster.local:8006/webhook"
+            send_resolved: false
 
 prometheusOperator:
   resources:
