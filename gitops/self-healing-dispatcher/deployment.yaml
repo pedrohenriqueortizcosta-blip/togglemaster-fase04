@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: self-healing-dispatcher
-          image: 108101918154.dkr.ecr.us-east-1.amazonaws.com/self-healing-dispatcher:v1.0.0-placeholder-1
+          image: 108101918154.dkr.ecr.us-east-1.amazonaws.com/self-healing-dispatcher:v1.0.0-cac41b7-1
           ports:
             - containerPort: 8006
           env:
