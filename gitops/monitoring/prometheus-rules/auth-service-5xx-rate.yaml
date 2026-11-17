@@ -17,11 +17,22 @@ spec:
           # auth-service/otel.go), routed through the OTel Collector's
           # "prometheus" exporter. http_status_code is a string label
           # ("200", "500", ...), hence the regex match for "5..".
+          #
+          # "exported_job", not "job": Prometheus's own scrape config
+          # assigns job="otel-collector-opentelemetry-collector" (the
+          # ServiceMonitor's name) to every metric passing through the
+          # Collector, and since every exported metric ALSO carries its
+          # own job label (= its service.name, e.g. "auth-service"),
+          # Prometheus's standard label-collision behavior (without
+          # honor_labels, which this chart doesn't expose a config knob
+          # for) renames the original to "exported_job" rather than
+          # dropping it. Confirmed directly against real 500-count data
+          # during Requirement 4 testing (2026-11-17).
           expr: |
             (
-              sum(rate(http_server_duration_milliseconds_count{job="auth-service", http_status_code=~"5.."}[2m]))
+              sum(rate(http_server_duration_milliseconds_count{exported_job="auth-service", http_status_code=~"5.."}[2m]))
               /
-              sum(rate(http_server_duration_milliseconds_count{job="auth-service"}[2m]))
+              sum(rate(http_server_duration_milliseconds_count{exported_job="auth-service"}[2m]))
             ) > 0.05
           for: 1m
           labels:
