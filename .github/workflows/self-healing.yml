@@ -1,0 +1,38 @@
+name: Self-Healing
+
+# Triggered by self-healing-dispatcher's repository_dispatch call (see
+# self-healing-dispatcher/app.py), itself triggered by Alertmanager's
+# webhook when AuthServiceHighErrorRate fires. Reuses the same OIDC role
+# every other CI pipeline already uses for ECR push -- now also granted
+# scoped kubectl access (get/list/patch on Deployments, auth-service
+# namespace only) via terraform/self-healing-rbac.tf's aws-auth mapping.
+on:
+  repository_dispatch:
+    types: [self-heal]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  restart-deployment:
+    name: Rollout restart (self-healing)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region us-east-1 --name togglemaster
+
+      - name: Rollout restart the affected deployment
+        env:
+          SERVICE: ${{ github.event.client_payload.service }}
+          ALERTNAME: ${{ github.event.client_payload.alertname }}
+        run: |
+          echo "Self-healing triggered by alert '${ALERTNAME}' for service '${SERVICE}'"
+          kubectl rollout restart deployment/"${SERVICE}" -n "${SERVICE}"
+          kubectl rollout status deployment/"${SERVICE}" -n "${SERVICE}" --timeout=120s
