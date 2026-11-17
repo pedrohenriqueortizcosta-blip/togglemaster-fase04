@@ -16,6 +16,15 @@ deploymentMode: SingleBinary
 
 loki:
   auth_enabled: false
+  # The chart defaults to replication_factor: 3 (meant for a multi-replica
+  # Simple Scalable/Distributed deployment) regardless of singleBinary mode.
+  # With only 1 replica (singleBinary.replicas below), Loki's internal ring
+  # health check then refuses both reads AND writes ("at least 2 live
+  # replicas required, could only find 1") — a real bug that silently broke
+  # log ingestion since the Phase 2 migration to this chart; the original
+  # verification only checked pod health, never an actual log query.
+  commonConfig:
+    replication_factor: 1
   storage:
     type: filesystem
   schemaConfig:
