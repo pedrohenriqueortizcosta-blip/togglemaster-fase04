@@ -53,8 +53,11 @@ resource "kubernetes_role" "self_healing_dispatcher" {
     resources  = ["deployments"]
     # "patch" is what `kubectl rollout restart` actually does under the
     # hood (it patches the pod template's restart annotation); get/list
-    # let it resolve/verify the deployment first.
-    verbs = ["get", "list", "patch"]
+    # let it resolve/verify the deployment first. "watch" was missing
+    # initially -- `kubectl rollout status` needs it to monitor progress
+    # efficiently; without it, kubectl degrades to noisy polling instead
+    # of failing outright (confirmed via a real self-healing run's logs).
+    verbs = ["get", "list", "watch", "patch"]
   }
 }
 
