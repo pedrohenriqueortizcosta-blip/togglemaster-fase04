@@ -17,6 +17,31 @@
 # managed) that this must not clobber.
 # ---------------------------------------------------------------------------
 
+# Real bug found during Requirement 4 testing: `aws eks update-kubeconfig`
+# needs this AWS IAM-level permission just to fetch the cluster's endpoint/
+# CA cert, BEFORE kubectl ever gets to use the Kubernetes RBAC granted
+# below -- a separate layer entirely from the in-cluster Role/RoleBinding.
+# First self-healing run failed on exactly this ("AccessDeniedException ...
+# eks:DescribeCluster ... no identity-based policy allows").
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_role_policy" "github_actions_eks_describe" {
+  name = "${split("/", module.github_oidc.role_arn)[1]}-eks-describe"
+  role = split("/", module.github_oidc.role_arn)[1]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "EKSDescribe"
+        Effect   = "Allow"
+        Action   = ["eks:DescribeCluster"]
+        Resource = "arn:aws:eks:us-east-1:${data.aws_caller_identity.current.account_id}:cluster/${module.eks.cluster_name}"
+      }
+    ]
+  })
+}
+
 resource "kubernetes_role" "self_healing_dispatcher" {
   metadata {
     name      = "self-healing-dispatcher"
